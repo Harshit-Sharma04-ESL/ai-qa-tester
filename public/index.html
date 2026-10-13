@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI QA Tester</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%234f6bed'/><path d='M9 16.5l4.5 4.5L23 11.5' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">✓</span> AI QA Tester</div>
+  <nav class="tabs" id="nav">
+    <button data-view="run" class="active">Run</button>
+    <button data-view="history">History</button>
+    <button data-view="scripts">Scripts</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+  <div class="chips">
+    <span class="chip" id="chip-ollama" title="Ollama"><i></i><span>Ollama…</span></span>
+    <span class="chip" id="chip-ws" title="Live connection"><i></i><span>Live</span></span>
+  </div>
+</header>
+
+<main>
+  <!-- ======================================================= RUN -->
+  <section id="view-run" class="view active">
+    <div class="run-grid">
+      <aside class="col-left">
+        <div class="card">
+          <div class="seg" id="mode-seg">
+            <button data-mode="ai" class="active">AI goal</button>
+            <button data-mode="script">Saved script</button>
+          </div>
+          <form id="run-form" autocomplete="off">
+            <div class="mode-ai">
+              <label>Target URL
+                <input id="in-url" type="url" placeholder="https://example.com" required value="https://the-internet.herokuapp.com/login">
+              </label>
+              <label>Test goal (plain English)
+                <textarea id="in-goal" rows="3" placeholder="e.g. test the login flow with valid and invalid passwords">Test the login flow with valid and invalid passwords</textarea>
+              </label>
+              <div class="examples" id="examples"></div>
+            </div>
+            <div class="mode-script hidden">
+              <label>Script
+                <select id="in-script"></select>
+              </label>
+              <p class="hint" id="script-hint"></p>
+            </div>
+            <div class="controls">
+              <button type="submit" class="btn primary" id="btn-run"><svg class="ico" viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>Run</button>
+              <button type="button" class="btn" id="btn-pause" disabled><svg class="ico" viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>Pause</button>
+              <button type="button" class="btn danger" id="btn-stop" disabled><svg class="ico" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg>Stop</button>
+            </div>
+            <p class="form-error" id="form-error"></p>
+          </form>
+        </div>
+
+        <div class="card" id="plan-card">
+          <div class="card-head"><h2>Test cases</h2><span class="muted" id="plan-count"></span></div>
+          <p class="muted small" id="analysis"></p>
+          <ol class="tests" id="tests"><li class="empty">Run a test to see the AI's test plan here.</li></ol>
+        </div>
+
+        <div class="card hidden" id="result-card">
+          <div class="card-head"><h2>Result</h2><span class="pill" id="result-status"></span></div>
+          <div class="tiles">
+            <div class="tile"><span>Passed</span><b class="c-pass" id="r-pass">0</b></div>
+            <div class="tile"><span>Failed</span><b class="c-fail" id="r-fail">0</b></div>
+            <div class="tile"><span>Skipped</span><b class="c-skip" id="r-skip">0</b></div>
+            <div class="tile"><span>Duration</span><b id="r-dur">–</b></div>
+          </div>
+          <div class="artifact-links" id="artifacts"></div>
+          <div class="controls wrap">
+            <button class="btn" id="btn-rerun" title="Run the same goal again with the AI">↻ Re-run</button>
+            <button class="btn" id="btn-replay" title="Replay the recorded steps without the AI">Replay steps</button>
+            <button class="btn" id="btn-save-script" title="Save the recorded steps as a re-runnable script">Save as script</button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="col-main">
+        <div class="card browser">
+          <div class="browser-bar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="addr" id="addr">about:blank</span>
+            <span class="pill" id="run-status">idle</span>
+          </div>
+          <div class="screen" id="screen-wrap">
+            <img id="screen" alt="Live browser view">
+            <video id="replay-video" controls class="hidden"></video>
+            <div class="screen-empty" id="screen-empty">
+              <div class="big">🖥</div>
+              <div>The test browser appears here live while a run is in progress.</div>
+            </div>
+          </div>
+          <div class="activity" id="activity"><span class="spinner hidden" id="spinner"></span><span id="activity-text">Ready.</span></div>
+        </div>
+
+        <div class="card">
+          <div class="seg small" id="log-seg">
+            <button data-pane="log" class="active">Step log</button>
+            <button data-pane="failures">Failures <b id="cnt-fail"></b></button>
+            <button data-pane="console">Console <b id="cnt-console"></b></button>
+            <button data-pane="network">Network <b id="cnt-network"></b></button>
+          </div>
+          <div class="pane active" id="pane-log"><ul class="log" id="log"></ul></div>
+          <div class="pane" id="pane-failures"><div id="failures" class="failures"><p class="muted">No failures.</p></div></div>
+          <div class="pane" id="pane-console"><table class="tbl"><thead><tr><th>Type</th><th>Message</th></tr></thead><tbody id="console"></tbody></table></div>
+          <div class="pane" id="pane-network"><table class="tbl"><thead><tr><th>Status</th><th>Method</th><th>URL</th></tr></thead><tbody id="network"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= HISTORY -->
+  <section id="view-history" class="view">
+    <div class="card">
+      <div class="card-head"><h2>Test history</h2><button class="btn small" id="btn-refresh-history">Refresh</button></div>
+      <div class="table-scroll">
+        <table class="tbl hover">
+          <thead><tr><th>When</th><th>Status</th><th>What</th><th>Result</th><th>Duration</th><th>Model</th><th></th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= SCRIPTS -->
+  <section id="view-scripts" class="view">
+    <div class="scripts-grid">
+      <div class="card">
+        <div class="card-head"><h2>Saved scripts</h2><button class="btn small" id="btn-new-script">+ New</button></div>
+        <ul class="script-list" id="script-list"></ul>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="script-title">Script editor</h2>
+          <div class="controls">
+            <button class="btn small primary" id="btn-script-run">▶ Run</button>
+            <button class="btn small" id="btn-script-save">Save</button>
+            <a class="btn small" id="btn-script-export">Export .spec.ts</a>
+            <button class="btn small danger" id="btn-script-delete">Delete</button>
+          </div>
+        </div>
+        <p class="hint">Steps use the same actions as the AI agent: <code>goto, click, fill, select, check, uncheck, press, hover, scroll, wait, back, assert_text, assert_no_text, assert_url, assert_title, assert_visible</code>. A <code>target</code> can have <code>css</code>, <code>role</code>+<code>name</code>, <code>label</code>, <code>placeholder</code> or <code>text</code>; they are tried in that order.</p>
+        <textarea id="script-json" class="code" spellcheck="false" rows="24"></textarea>
+        <p class="form-error" id="script-error"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= SETTINGS -->
+  <section id="view-settings" class="view">
+    <div class="settings-grid">
+      <div class="card">
+        <h2>AI model</h2>
+        <dl class="kv">
+          <dt>Ollama</dt><dd id="s-ollama">–</dd>
+          <dt>Hardware</dt><dd id="s-hw">–</dd>
+          <dt>Why this model</dt><dd id="s-reason">–</dd>
+          <dt>Browser</dt><dd id="s-browser">–</dd>
+        </dl>
+        <form id="settings-form">
+          <label>Agent model (plans tests, drives the browser, explains failures)
+            <select id="s-model"></select>
+          </label>
+          <label>Vision model for failure screenshots (optional; empty = text only)
+            <select id="s-vision"></select>
+          </label>
+          <div class="row2">
+            <label>Max test cases per goal<input id="s-maxtests" type="number" min="1" max="10"></label>
+            <label>Max AI turns per test<input id="s-maxsteps" type="number" min="2" max="30"></label>
+          </div>
+          <button class="btn primary" type="submit">Save settings</button>
+          <span class="muted small" id="settings-saved"></span>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Install another model</h2>
+        <p class="hint">Any model from <a href="https://ollama.com/library" target="_blank" rel="noopener">ollama.com/library</a> works; models with tool-calling and JSON output follow instructions best. Suggestions:</p>
+        <ul class="suggest" id="suggest"></ul>
+        <form id="pull-form" class="inline">
+          <input id="pull-name" placeholder="e.g. qwen3-vl:8b-instruct">
+          <button class="btn" type="submit">Pull</button>
+        </form>
+        <div id="pulls"></div>
+        <h2 class="mt">Installed models</h2>
+        <table class="tbl"><thead><tr><th>Model</th><th>Params</th><th>Size</th></tr></thead><tbody id="installed"></tbody></table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast hidden" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

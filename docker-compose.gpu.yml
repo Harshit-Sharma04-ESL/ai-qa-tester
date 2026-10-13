@@ -1,0 +1,11 @@
+# NVIDIA GPU override (used automatically by start.sh when a GPU + NVIDIA Container Toolkit are found):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

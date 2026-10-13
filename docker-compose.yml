@@ -1,0 +1,63 @@
+# One command: ./start.sh   (or: docker compose up -d --build)
+# Values come from .env (created by start.sh from your hardware; see .env.example).
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  browser:
+    # Headless Chromium behind a Playwright server; the app connects over WebSocket.
+    build: .
+    image: ai-qa-tester:latest
+    restart: unless-stopped
+    command: ["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0"]
+    init: true
+    shm_size: 1gb
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app:
+    build: .
+    image: ai-qa-tester:latest
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      BROWSER_WS_ENDPOINT: ws://browser:3000/
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3-vl:4b-instruct}
+      VISION_MODEL: ${VISION_MODEL:-}
+      OLLAMA_AUTO_PULL: ${OLLAMA_AUTO_PULL:-true}
+      MAX_TESTS: ${MAX_TESTS:-4}
+      MAX_STEPS_PER_TEST: ${MAX_STEPS_PER_TEST:-8}
+      HW_SUMMARY: ${HW_SUMMARY:-}
+      MODEL_REASON: ${MODEL_REASON:-}
+    volumes:
+      - qa-data:/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+      browser:
+        condition: service_healthy
+
+volumes:
+  # Named "ollama" so models from a standalone `docker run ... -v ollama:/root/.ollama` container are reused.
+  ollama:
+    name: ollama
+  qa-data:

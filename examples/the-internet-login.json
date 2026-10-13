@@ -1,0 +1,30 @@
+{
+  "name": "Example: the-internet login (valid + invalid)",
+  "url": "https://the-internet.herokuapp.com/login",
+  "tests": [
+    {
+      "title": "Valid credentials log the user in",
+      "expected": "Secure Area page with a success message",
+      "steps": [
+        { "action": "goto", "value": "https://the-internet.herokuapp.com/login" },
+        { "action": "fill", "target": { "css": "#username", "role": "textbox", "name": "Username", "label": "Username" }, "value": "tomsmith" },
+        { "action": "fill", "target": { "css": "#password", "role": "textbox", "name": "Password", "label": "Password" }, "value": "SuperSecretPassword!" },
+        { "action": "click", "target": { "css": "button[type=\"submit\"]", "role": "button", "name": "Login" } },
+        { "action": "assert_url", "value": "/secure" },
+        { "action": "assert_text", "value": "You logged into a secure area!" }
+      ]
+    },
+    {
+      "title": "Wrong password shows an error",
+      "expected": "Stays on login page with 'Your password is invalid!'",
+      "steps": [
+        { "action": "goto", "value": "https://the-internet.herokuapp.com/login" },
+        { "action": "fill", "target": { "css": "#username", "role": "textbox", "name": "Username", "label": "Username" }, "value": "tomsmith" },
+        { "action": "fill", "target": { "css": "#password", "role": "textbox", "name": "Password", "label": "Password" }, "value": "wrong-password" },
+        { "action": "click", "target": { "css": "button[type=\"submit\"]", "role": "button", "name": "Login" } },
+        { "action": "assert_url", "value": "/login" },
+        { "action": "assert_text", "value": "Your password is invalid!" }
+      ]
+    }
+  ]
+}
